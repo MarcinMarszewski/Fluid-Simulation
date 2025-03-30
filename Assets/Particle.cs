@@ -5,6 +5,5 @@ using UnityEngine;
 public struct Particle {
     public Vector3 position;
     public Vector3 velocity;
-    public Color color;
-    public float angularVelocity;
+    public float density;
 }

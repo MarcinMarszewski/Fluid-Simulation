@@ -17,14 +17,13 @@ public class FluidManager : MonoBehaviour
 
     void Start()
     {
+        
         particles = new Particle[particleCount];
         for (int i = 0; i < particleCount; i++)
         {
             particles[i] = new Particle();
-            particles[i].position = new Vector3(Random.Range(-5, 5), Random.Range(-5, 5), Random.Range(-5, 5));
-            particles[i].velocity = new Vector3(Random.Range(-1, 1), Random.Range(-1, 1), Random.Range(-1, 1));
-            particles[i].color = new Color(Random.Range(0, 1), Random.Range(0, 1), Random.Range(0, 1));
-            particles[i].angularVelocity = Random.Range(-1, 1);
+            particles[i].position = new Vector3(((i%100)/10)/10.0f, (i%10)/10.0f, 0.0f); // 2d spawn
+            //particles[i].velocity = new Vector3(Random.Range(-1, 1), Random.Range(-1, 1), Random.Range(-1, 1));
         }
         particleSimulator.particles = particles;
     }
