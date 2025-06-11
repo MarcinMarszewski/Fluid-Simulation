@@ -23,7 +23,7 @@ public class SimpleSPHSimulator : AbstractParticleSimulator
     private float simulationTimeStep = 0.01f;
     override public void SimulateStep() {
         ComputeDensities();
-        SimulateGravityForces();
+        //SimulateGravityForces();
         SimulatePressureForces();
         ApplyVelocities();
         ResolveBoundaryCollision();
@@ -50,7 +50,7 @@ public class SimpleSPHSimulator : AbstractParticleSimulator
 
     private void ResolveBoundaryCollision() {
         for (int i = 0; i < particles.Length; i++) {
-            if (particles[i].position.y < 0.0f) {
+            if (Abs(particles[i].position.y) > boundaryDistance) {
                 particles[i].position.y = 0.0f;
                 particles[i].velocity.y *= -dampingFactor;
             }
