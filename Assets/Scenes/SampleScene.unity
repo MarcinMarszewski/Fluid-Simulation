@@ -320,7 +320,7 @@ GameObject:
   - component: {fileID: 1606421815}
   - component: {fileID: 1606421816}
   - component: {fileID: 1606421817}
-  - component: {fileID: 1606421818}
+  - component: {fileID: 1606421819}
   m_Layer: 0
   m_Name: SimulationManager
   m_TagString: Untagged
@@ -355,9 +355,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5182992be6371f439e418d2c1ab3bd3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  particleCount: 400
+  particleCount: 100
   particleDisplay: {fileID: 1606421816}
-  particleSimulator: {fileID: 1606421818}
+  particleSimulator: {fileID: 1606421819}
 --- !u!114 &1606421816
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -382,7 +382,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5068101a4c3e2f74d861bfbc10b94421, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &1606421818
+--- !u!114 &1606421819
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -391,16 +391,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 1606421812}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bbaf7c878b7bfb84e86ba5f84cbf8052, type: 3}
+  m_Script: {fileID: 11500000, guid: 45ea70e5a2dd81d489ad8bde7e535de3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gravity: 9.8
-  mass: 1
-  dampingFactor: 1
-  boundaryDistance: 0.5
-  smoothingRadius: 0.78
-  restDensity: 1
-  pressureStiffness: 1
+  gasCosntant: 3.9
+  restDensity: 4.9
+  particleMass: 1
+  smoothingRadius: 7.47
+  boundaryDistance: 2.15
+  simulationTimeStep: 0.1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

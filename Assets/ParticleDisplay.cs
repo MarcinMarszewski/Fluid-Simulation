@@ -22,7 +22,7 @@ public class ParticleDisplay : MonoBehaviour
         Gizmos.color = Color.red;
         foreach (Particle particle in particles)
         {
-            Gizmos.DrawSphere(particle.position, 0.1f);
+            Gizmos.DrawSphere(particle.position, 0.02f);
         }
     }
 }
