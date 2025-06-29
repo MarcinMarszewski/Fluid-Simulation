@@ -24,17 +24,17 @@ public class NewBehaviourScript : AbstractParticleSimulator
     private float boundarySpringConstant = 0.9f;
     public override void SimulateStep()
     {
-        UpdateParticleDensities();
+        /* UpdateParticleDensities();
         for (int i = 0; i < particles.Length; i++)
         {
             particles[i].velocity += GetParticleAcceleration(i);
             particles[i].position += particles[i].velocity * simulationTimeStep; // Where do we apply time factor?
         }
 
-        ComputeBoundaries();
+        ComputeBoundaries(); */
     }
 
-    private void UpdateParticleDensities()
+    /* private void UpdateParticleDensities()
     {
         for (int i = 0; i < particles.Length; i++)
         {
@@ -156,5 +156,5 @@ public class NewBehaviourScript : AbstractParticleSimulator
             return 0.0f;
         return 315.0f / (64.0f * Mathf.PI * Mathf.Pow(smoothingRadius, 9))
             * Mathf.Pow(smoothingRadius*smoothingRadius - distance*distance, 6);
-    }
+    } */
 }

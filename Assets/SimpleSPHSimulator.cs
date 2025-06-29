@@ -2,155 +2,223 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using static System.Math;
+using System;
 
-public class SimpleSPHSimulator : AbstractParticleSimulator
+public class SimpleSPHSimulator : MonoBehaviour
 {
+        //Simulation parameters
     [SerializeField]
-    private float gravity = 9.8f;
+    private float errRate = 0.000001f;
+    [SerializeField]
+    private float particleGridSize = 20;
+    [SerializeField]
+    private float simulationTimeStep = 0.01f;
+
+        //Base
     [SerializeField]
     private float mass = 1.0f;
     [SerializeField]
+    private float smoothingRadius = 1.0f;
+    
+        //Boundary
+    [SerializeField]
     private float dampingFactor = 1.0f;
     [SerializeField]
-    private float boundaryDistance = 1.0f;
+    private float boundaryDistance = 3.0f;
+
+        //External forces
     [SerializeField]
-    private float smoothingRadius = 1.0f;
+    private float gravity = 1.0f;
+   
+        //Pressure
     [SerializeField]
     private float restDensity = 1.0f;
     [SerializeField]
-    private float pressureStiffness = 1.0f;
+    private float pressureMultiplier = 1.0f;
     [SerializeField]
-    private float simulationTimeStep = 0.01f;
-    override public void SimulateStep() {
-        ComputeDensities();
-        //SimulateGravityForces();
-        SimulatePressureForces();
-        ApplyVelocities();
-        ResolveBoundaryCollision();
+    private float nearPressureMultiplier = 1.0f;
+
+        //Viscosity
+    [SerializeField]
+    private float viscosityMultiplier = 1.0f;
+
+
+    public List<Particle> particles = new List<Particle>();
+
+
+    void Start(){
+        for(int i = 0; i<particleGridSize; i++){
+            for (int j = 0; j < particleGridSize; j++)
+            {
+                Particle particle = new Particle();
+                particle.position = new Vector2(i * 1.41f / restDensity, j * 1.41f / restDensity);
+                particle.predictedPosition = new Vector2(0.0f, 0.0f);
+                particle.velocity = new Vector2(0.0f, 0.0f);
+                particle.density = 0.0f;
+                particle.nearDensity = 0.0f;
+                particles.Add(particle);
+            }
+        }
     }
 
-    private void ApplyVelocities(){
-        for (int i = 0; i < particles.Length; i++) {
-            particles[i].position += particles[i].velocity * simulationTimeStep;
+    void Update() {
+        SimulateStep();
+    }
+    
+
+    public void SimulateStep() {
+        ResolveBoundaryCollision();
+        PredictPositions();
+        ComputeDensities();
+        ComputeNearDensities();
+        SimulateExternalForces();
+        SimulatePressureForces();
+        SimulateViscosityForces();
+        ApplyVelocities();
+    }
+
+    private void ResolveBoundaryCollision() {
+        for(int i = 0; i < particles.Count; i++) {
+            Particle particle = particles[i];
+            if (particle.position.x < 0 || particle.position.x > boundaryDistance) {
+                particle.velocity.x = -particle.velocity.x * dampingFactor;
+                particle.position.x = Mathf.Clamp(particle.position.x, 0, boundaryDistance);
+            }
+            if (particle.position.y < 0 || particle.position.y > boundaryDistance) {
+                particle.velocity.y = -particle.velocity.y * dampingFactor;
+                particle.position.y = Mathf.Clamp(particle.position.y, 0, boundaryDistance);
+            }
+            particles[i] = particle;
+        }
+    }
+
+    private void PredictPositions(){
+        for(int i = 0; i < particles.Count; i++) {
+            Particle particle = particles[i];
+            particle.predictedPosition = particle.position + particle.velocity * simulationTimeStep;
+            particles[i] = particle;
+        }
+    }
+
+    private void ComputeDensities() {
+        for(int i = 0; i < particles.Count; i++) {
+            Particle particle = particles[i];
+            particle.density = 0.0f;
+            for(int j = 0; j < particles.Count; j++) {
+                if (i != j) {
+                    Vector2 r = particle.predictedPosition - particles[j].predictedPosition;
+                    float distance = r.magnitude;
+                    if (distance < smoothingRadius) {
+                        particle.density += mass * Kernel.Quad(smoothingRadius, distance);
+                    }
+                }
+            }
+            particles[i] = particle;
+        }
+    }
+
+    private void ComputeNearDensities() {
+        for(int i = 0; i < particles.Count; i++) {
+            Particle particle = particles[i];
+            particle.nearDensity = 0.0f;
+            for(int j = 0; j < particles.Count; j++) {
+                if (i != j) {
+                    Vector2 r = particle.predictedPosition - particles[j].predictedPosition;
+                    float distance = r.magnitude;
+                    if (distance < smoothingRadius) {
+                        particle.nearDensity += mass * Kernel.NearDensity(smoothingRadius, distance);
+                    }
+                }
+            }
+            particles[i] = particle;
+        }
+    }
+
+    private void SimulateExternalForces() {
+        for(int i = 0; i < particles.Count; i++) {
+            if(particles[i].density < 0) continue;
+            Particle particle = particles[i];
+            particle.velocity += new Vector2(0.0f, -gravity) * simulationTimeStep / particle.density;
+            particles[i] = particle;
         }
     }
 
     private void SimulatePressureForces() {
-        for (int i = 0; i < particles.Length; i++) {
-            particles[i].velocity += PressureForceMultiplier(particles[i].density) 
-            * PressureGradientAtPoint(particles[i].position) * simulationTimeStep / particles[i].density;
-        }
-    }
-
-    private void SimulateGravityForces() {
-        for (int i = 0; i < particles.Length; i++) {
-            particles[i].velocity += Vector3.down * gravity * simulationTimeStep;
-        }
-    }
-
-    private void ResolveBoundaryCollision() {
-        for (int i = 0; i < particles.Length; i++) {
-            if (Abs(particles[i].position.y) > boundaryDistance) {
-                particles[i].position.y = 0.0f;
-                particles[i].velocity.y *= -dampingFactor;
+        for (int i = 0; i < particles.Count; i++) {
+            Particle particle = particles[i];
+            Vector2 pressureGradient = Vector2.zero;
+            for (int j = 0; j < particles.Count; j++) 
+            {
+                if (i == j) 
+                    continue;
+                Particle other = particles[j];
+                float distance = Vector2.Distance(particle.position, other.position);
+                Vector2 direction = distance == 0 ? UnityEngine.Random.insideUnitCircle.normalized : (particle.position - other.position).normalized;
+                float slope = Kernel.GradQuad(smoothingRadius, distance);
+                if (slope == 0) 
+                    continue;
+                float sharedPressure = (DensityToPressure(particle.density) + DensityToPressure(other.density)) / 2.0f;
+                float sharedNearPressure = (particle.nearDensity + other.nearDensity) * nearPressureMultiplier / 2.0f;
+                pressureGradient += (-sharedNearPressure - sharedPressure) * slope * direction * mass / other.density;
             }
-            if(Abs(particles[i].position.x) > boundaryDistance) {
-                particles[i].position.x = boundaryDistance * Sign(particles[i].position.x);
-                particles[i].velocity.x *= -dampingFactor;
+            if (particle.density > 0) 
+            {
+                particle.velocity += pressureGradient * simulationTimeStep / particle.density;
             }
-            if(Abs(particles[i].position.z) > boundaryDistance) {
-                particles[i].position.z = boundaryDistance * Sign(particles[i].position.z);
-                particles[i].velocity.z *= -dampingFactor;
+            particles[i] = particle;
+        }
+    }
+
+    private void SimulateViscosityForces() {
+        for (int i = 0; i < particles.Count; i++) {
+            Particle particle = particles[i];
+            Vector2 viscosityForce = Vector2.zero;
+            for (int j = 0; j < particles.Count; j++) {
+                if (i == j) continue;
+                Particle other = particles[j];
+                float distance = Vector2.Distance(particle.position, other.position);
+                if (distance < smoothingRadius) {
+                    float influence = Kernel.Cubic(smoothingRadius, distance);
+                    viscosityForce += (other.velocity - particle.velocity) * influence * mass / other.density;
+                }
             }
+            if (particle.density > 0) {
+                particle.velocity += viscosityForce * simulationTimeStep * viscosityMultiplier / particle.density;
+            }
+            particles[i] = particle;
         }
     }
 
-    private float DensityAtPoint(Vector3 point) {
-        float density = 0.0f;
-        for (int i = 0; i < particles.Length; i++) {
-            density += mass * DebrunsKernel(Vector3.Distance(point, particles[i].position));
-        }
-        return density;
-    }
-
-    private Vector3 PressureGradientAtPoint(Vector3 point) {
-        Vector3 pressureGradient = Vector3.zero;
-        for (int i = 0; i < particles.Length; i++) {
-            pressureGradient += mass * DebrunsKernelGradient(Vector3.Distance(point, particles[i].position)) 
-            * ((particles[i].position - point).normalized) / particles[i].density;
-        }
-        return pressureGradient;
-    }
-
-    private void ComputeDensities() {
-        for (int i = 0; i < particles.Length; i++) {
-            particles[i].density = DensityAtPoint(particles[i].position);
+    private void ApplyVelocities(){
+        for(int i = 0; i < particles.Count; i++) {
+            Particle particle = particles[i];
+            particle.position += particle.velocity * simulationTimeStep;
+            particles[i] = particle;
         }
     }
 
-    private float PressureForceMultiplier(float density) {
-        return pressureStiffness * (density - restDensity);
+
+    private float DensityToPressure(float density) {
+        return pressureMultiplier * (density - restDensity);
     }
 
-        private float CosineKernel(float distance) {
-        if(distance < smoothingRadius) {
-            return (float)Cos(PI*distance/smoothingRadius)+1.0f;
+    void OnDrawGizmos() {
+        Console.WriteLine("Drawing Gizmos for particles");
+        Gizmos.color = Color.blue;
+        if (particles == null || particles.Count == 0) {
+            // Preview particles in edit mode
+            for (int i = 0; i < particleGridSize; i++) {
+                for (int j = 0; j < particleGridSize; j++)
+                {
+                    Vector2 pos = new Vector2(i * 1.41f / restDensity, j * 1.41f / restDensity);
+                    Gizmos.DrawSphere(new Vector3(pos.x, pos.y, 0), 0.1f);
+                    Console.WriteLine($"Particle Position: {pos.x}, {pos.y}");
+                }
+            }
         } else {
-            return 0.0f;
-        }
-    }
-
-    private float CosineKernelGradient(float distance) {
-        if(distance < smoothingRadius) {
-            return (float)((-PI / smoothingRadius) * Sin(PI * distance / smoothingRadius));
-        } else {
-            return 0.0f;
-        }
-    }
-
-    private float CubicSplineSmoothingKernel(float distance) {
-        float q = distance / smoothingRadius;
-        if (q < 1.0f) {
-            return (float)(((2.0f / 3.0f) - Pow(q, 2) + 0.5f * Pow(q, 3)) 
-                * (3.0f/(2.0f*PI*Pow(smoothingRadius, 3))));
-        } else if (q < 2.0f) {
-            return (float)((Pow(2.0f - q, 3) / 6.0f) 
-                * (3.0f/(2.0f*PI*Pow(smoothingRadius, 3))));
-        } else {
-            return 0.0f;
-        }
-    }
-
-    private float CubicSplineSmoothingKernelGradient(float distance) {
-        float q = distance / smoothingRadius;
-        if (q < 1.0f) {
-            return (float)(((3.0f * smoothingRadius * smoothingRadius - 4.0f *smoothingRadius * distance)
-                / (2.0f * Pow(smoothingRadius, 3))) 
-                * (3.0f/(2.0f*PI*Pow(smoothingRadius, 3))));
-        } else if (q < 2.0f) {
-            return (float)(((-4.0f * smoothingRadius * smoothingRadius + 4.0f * smoothingRadius * distance - distance * distance)
-            / (2.0f * Pow(smoothingRadius, 3)))
-            * (3.0f/(2.0f*PI*Pow(smoothingRadius, 3))));
-        } else {
-            return 0.0f;
-        }
-    }
-
-    private float DebrunsKernel(float distance) {
-        if (distance < smoothingRadius) {
-            return (float)((15.0f /(PI * Pow(smoothingRadius, 6)))
-                    * Pow((smoothingRadius - distance), 3));
-        } else {
-            return 0.0f;
-        }
-    }
-
-    private float DebrunsKernelGradient(float distance) {
-        if (distance < smoothingRadius) {
-            return (float)((-45.0f /(PI * Pow(smoothingRadius, 6)))
-                    * Pow((smoothingRadius - distance), 2));
-        } else {
-            return 0.0f;
+            foreach (Particle particle in particles) {
+                Gizmos.DrawSphere(new Vector3(particle.position.x, particle.position.y, 0), 0.1f);
+            }
         }
     }
 }
