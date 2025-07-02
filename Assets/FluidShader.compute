@@ -1,0 +1,201 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel UpdatePosition
+#pragma kernel ResolveCollision
+#pragma kernel ComputeDensity
+#pragma kernel ComputePressureForce
+#pragma kernel ApplyExternalForce
+#pragma kernel PredictPosition
+#pragma kernel ComputeViscosityForce
+
+struct Particle
+{
+    float2 position;
+    float2 predictedPosition;
+    float2 velocity;
+    float density;
+    float nearDensity;
+};
+
+RWStructuredBuffer<Particle> particles;
+
+float timeStep;
+float gravityConstant;
+uint particleCount;
+float boundarySize;
+float boundaryDampingFactor;
+float particleMass;
+float smoothingRadius;
+float pressureConstant;
+float nearPressureConstant;
+float restDensity;
+float viscosityConstant;
+
+static float PI = 3.141592f;
+
+
+float rand(uint seed)
+{
+    seed = (seed ^ 61) ^ (seed >> 16);
+    seed *= 9;
+    seed = seed ^ (seed >> 4);
+    seed *= 0x27d4eb2d;
+    seed = seed ^ (seed >> 15);
+    return frac((float)seed / 4294967296.0f);
+}
+
+
+float DensityToPressure(float density)
+{
+    return pressureConstant * (density - restDensity);
+}
+
+float DensityKernel(float distance)
+{
+    if ( distance > smoothingRadius)
+        return 0.0f;
+    float volume = PI * pow(smoothingRadius, 3) / 6.0f;
+    return pow(smoothingRadius - distance, 2) / volume;
+}
+
+float DensityKernelGradient(float distance)
+{
+    if (distance > smoothingRadius)
+        return 0.0f;
+    float scale = 12.0f / (pow(smoothingRadius, 4) * PI);
+    return (distance - smoothingRadius) * scale;
+}
+
+float NearDensityKernel(float distance)
+{
+    if (distance > smoothingRadius)
+        return 0.0f;
+    float volume = PI * pow(smoothingRadius, 5) / 4.0f;
+    return pow(distance - smoothingRadius, 4) / volume;
+}
+
+float ViscosityKernel(float distance)
+{
+    if (distance > smoothingRadius)
+        return 0.0f;
+    float volume = PI * pow(smoothingRadius, 8) / 4.0f;
+    return pow(smoothingRadius - distance, 3) / volume;
+}
+
+
+[numthreads(64, 1, 1)]
+void ResolveCollision(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= particleCount) return;
+    if (particles[id.x].position.y > boundarySize) {
+        particles[id.x].position.y = boundarySize;
+        particles[id.x].velocity.y *= -boundaryDampingFactor;
+    } else if (particles[id.x].position.y < -boundarySize) {
+        particles[id.x].position.y = -boundarySize;
+        particles[id.x].velocity.y *= -boundaryDampingFactor;
+    }
+
+    if (particles[id.x].position.x > boundarySize) {
+        particles[id.x].position.x = boundarySize;
+        particles[id.x].velocity.x *= -boundaryDampingFactor;
+    } else if (particles[id.x].position.x < -boundarySize) {
+        particles[id.x].position.x = -boundarySize;
+        particles[id.x].velocity.x *= -boundaryDampingFactor;
+    }
+}
+
+[numthreads(64, 1, 1)]
+void ComputeDensity(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= particleCount) return;
+    particles[id.x].density = 0.0f;
+    particles[id.x].nearDensity = 0.0f;
+    for (uint j = 0; j < particleCount; j++)
+    {
+        if (j == id.x) continue;
+        Particle other = particles[j];
+        float2 diff = particles[id.x].predictedPosition - other.predictedPosition;
+        float dist = length(diff);
+        particles[id.x].density +=  particleMass * DensityKernel(dist);
+        particles[id.x].nearDensity += particleMass * NearDensityKernel(dist);
+    }
+}
+
+[numthreads(64, 1, 1)]
+void ComputePressureForce(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= particleCount) return;
+    float2 pressureForce = float2(0.0f, 0.0f);
+
+    for (uint j = 0; j < particleCount; j++)
+    {
+        if (j == id.x) continue;
+        Particle other = particles[j];
+        if (other.density == 0.0f) continue;
+        float2 diff = particles[id.x].position - other.position;
+        float dist = length(diff);
+        float2 dir = float2(0.0f, 0.0f);
+        if (dist == 0.0f){
+            dir = normalize(float2(rand(id.x + j) * 2.0f - 1.0f, rand(id.x * j + 1) * 2.0f - 1.0f)); // Random direction
+            //dist = 0.0001f;
+        }
+        else
+            dir = normalize(diff);
+        float slope = DensityKernelGradient(dist);
+        if (slope == 0.0f) continue;
+        float pressure = (DensityToPressure(particles[id.x].density) + DensityToPressure(other.density)) / 2.0f;
+        float nearPressure = nearPressureConstant * (particles[id.x].nearDensity + other.nearDensity) / 2.0f;
+        pressureForce += (-pressure - nearPressure) * slope * dir * particleMass / other.density; //TODO: check if near pressure should use its own slope
+    }
+    if (particles[id.x].density > 0.0f)
+    {
+        particles[id.x].velocity += pressureForce * timeStep / particles[id.x].density;
+    }
+}
+
+
+[numthreads(64, 1, 1)]
+void ApplyExternalForce(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= particleCount) return;
+    particles[id.x].velocity.y -= gravityConstant * timeStep;
+}
+
+
+[numthreads(64, 1, 1)]
+void UpdatePosition(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= particleCount) return;
+    //if (length(particles[id.x].velocity) > 20.0f) {
+    //    particles[id.x].velocity = normalize(particles[id.x].velocity) * 20.0f; // Clamp velocity to prevent excessive speeds
+    //}
+    particles[id.x].position += particles[id.x].velocity * timeStep;
+}
+
+[numthreads(64, 1, 1)]
+void PredictPosition(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= particleCount) return;
+    particles[id.x].predictedPosition = particles[id.x].position + particles[id.x].velocity * timeStep;
+}
+
+[numthreads(64, 1, 1)]
+void ComputeViscosityForce(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= particleCount) return;
+    float2 viscosityForce = float2(0.0f, 0.0f);
+
+    for (uint j = 0; j < particleCount; j++)
+    {
+        if (j == id.x) continue;
+        Particle other = particles[j];
+        if (other.density == 0.0f) continue;
+        float2 diff = particles[id.x].position - other.position;
+        float dist = length(diff);
+        float influence = ViscosityKernel(dist);
+        viscosityForce += influence * (other.velocity - particles[id.x].velocity) * particleMass / other.density;
+    }
+    if (particles[id.x].density > 0.0f)
+    {
+        particles[id.x].velocity += viscosityForce * timeStep * viscosityConstant / particles[id.x].density;
+    }
+}

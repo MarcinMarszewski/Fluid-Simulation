@@ -26,7 +26,6 @@ public static class Kernel
     public static float Cubic(float h, float r) {
         if (r > h) return 0f;
         float volume = Mathf.PI * Mathf.Pow(h, 8) / 4f;
-        float val = Mathf.Max(0, h - r);
-        return Mathf.Pow(val, 3) / volume;
+        return Mathf.Pow(h-r, 3) / volume;
     }
 }

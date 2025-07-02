@@ -122,6 +122,63 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &565128035
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 565128037}
+  - component: {fileID: 565128036}
+  m_Layer: 0
+  m_Name: GPUSimulation
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &565128036
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 565128035}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 05ec18518f010a9448d38c00d0b7efd9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fluidShader: {fileID: 7200000, guid: 01fe15e1c1512b940ae64c6100b5288e, type: 3}
+  timeStep: 0.01
+  gravityConstant: 4
+  boundarySize: 5
+  boundaryDampingFactor: 0.8
+  particleMass: 1
+  smoothingRadius: 0.5
+  pressureConstant: 40
+  nearPressureConstant: 60
+  viscosityConstant: 1
+  restDensity: 7
+  particleGridSize: 20
+  spawnSpacingMultiplier: 1.68
+--- !u!4 &565128037
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 565128035}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.996404, y: 1.8972747, z: -13.459301}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
@@ -319,7 +376,7 @@ GameObject:
   - component: {fileID: 1606421814}
   - component: {fileID: 1606421815}
   m_Layer: 0
-  m_Name: SimulationManager
+  m_Name: CPUSimulation
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -347,22 +404,22 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1606421812}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bbaf7c878b7bfb84e86ba5f84cbf8052, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  errRate: 0.000001
-  particleGridSize: 20
+  particleGridSize: 30
+  spawnSpacingMultiplier: 1.68
   simulationTimeStep: 0.01
   mass: 1
-  smoothingRadius: 1
-  dampingFactor: 1
-  boundaryDistance: 3
-  gravity: 1
-  restDensity: 1
-  pressureMultiplier: 1
-  nearPressureMultiplier: 1
+  smoothingRadius: 0.5
+  dampingFactor: 0.8
+  boundaryDistance: 10
+  gravity: 4
+  restDensity: 7
+  pressureMultiplier: 40
+  nearPressureMultiplier: 120
   viscosityMultiplier: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
@@ -371,3 +428,4 @@ SceneRoots:
   - {fileID: 963194228}
   - {fileID: 705507995}
   - {fileID: 1606421814}
+  - {fileID: 565128037}
