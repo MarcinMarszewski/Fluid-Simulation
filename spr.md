@@ -10,6 +10,12 @@ Projekt zakłada odpowiednie zrównoleglenie w obrębie procesora graficznego (w
 Dzielenie pracy pomiędzy maszynami zakłada bardziej zaawansowany system podziału przestrzeni, uwzględniający fizyczne właściwości sprzętu.
 Pojedyncza maszyna wykonywałaby obliczenia dla zestawu podprzestrzeni wewnętrznych wyłącznych dla niej, oraz podprzestrzeni zewnętrznych wymagających synchronizacji z innymi maszynami.
 
+alt:  
+symulacja z wyświetlaniem: pozycji, gęstości, prędkości. siatki
+opcje podziału przestrzeni: równomierna siatka (różne metody numerowania), nierównomierna siatka, quad-tree
+algorytmy sortowania: bitonic, radix
+wprowadzanie parametrów symulacji
+
 # Etapy projektu
 ## Implementacja sekwencyjna w środowisku unity
 ## Wykorzystanie unity compute shaders 
@@ -24,3 +30,4 @@ https://www.sci.utah.edu/publications/premoze03/ParticleFluidsHiRes.pdf
 https://cg.informatik.uni-freiburg.de/course_notes/sim_10_sph.pdf
 https://developer.download.nvidia.com/presentations/2008/GDC/GDC08_ParticleFluids.pdf
 https://www.ljll.fr/~frey/papers/levelsets/Clavet%20S.,%20Particle-based%20viscoelastic%20fluid%20simulation.pdf
+https://www-cs.ccny.cuny.edu/~jzhang/papers/rtree_tr.pdf
