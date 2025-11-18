@@ -309,7 +309,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1259511734}
   - component: {fileID: 1259511735}
-  - component: {fileID: 1259511736}
+  - component: {fileID: 1259511737}
   m_Layer: 0
   m_Name: goodSimulation
   m_TagString: MainCamera
@@ -383,7 +383,7 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!114 &1259511736
+--- !u!114 &1259511737
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -392,7 +392,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1259511730}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 817380ac2f5b6904d967d9082b5b71ed, type: 3}
+  m_Script: {fileID: 11500000, guid: 012df7d0e2977ba48913f9f7a345f18b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   timeScale: 1
@@ -405,11 +405,11 @@ MonoBehaviour:
   viscosityMultiplier: 0.06
   boundsSize: {x: 16, y: 9}
   collisionDamping: 0.95
-  compute: {fileID: 7200000, guid: 225d07d2d72a66649a31ecacccfb6cd2, type: 3}
-  particleCount: 1000
+  compute: {fileID: 7200000, guid: 59e8a7b946eeb9b4ca0c2013ba367587, type: 3}
+  particleCount: 1024
   initialVelocity: {x: 0, y: 0}
   spawnCentre: {x: 0, y: 0}
-  spawnSize: {x: 1.69, y: 2.57}
+  spawnSize: {x: 12, y: 6}
 --- !u!1 &1812641185
 GameObject:
   m_ObjectHideFlags: 0

@@ -309,7 +309,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1259511734}
   - component: {fileID: 1259511735}
-  - component: {fileID: 1259511736}
+  - component: {fileID: 1259511737}
   m_Layer: 0
   m_Name: goodSimulation
   m_TagString: MainCamera
@@ -383,7 +383,7 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!114 &1259511736
+--- !u!114 &1259511737
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -392,24 +392,25 @@ MonoBehaviour:
   m_GameObject: {fileID: 1259511730}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 817380ac2f5b6904d967d9082b5b71ed, type: 3}
+  m_Script: {fileID: 11500000, guid: c12a8f5456b3bca44a51d89430f5e9af, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  timeScale: 1
+  timeScale: 0.05
   iterationsPerFrame: 1
   gravity: -2
   smoothingRadius: 0.415
-  targetDensity: 20
+  targetDensity: 160
   pressureMultiplier: 500
-  nearPressureMultiplier: 20
+  nearPressureMultiplier: 30
   viscosityMultiplier: 0.06
   boundsSize: {x: 16, y: 9}
   collisionDamping: 0.95
-  compute: {fileID: 7200000, guid: 225d07d2d72a66649a31ecacccfb6cd2, type: 3}
-  particleCount: 1000
+  compute: {fileID: 7200000, guid: 8a3c31367cc5dce4a8ccf3f3017251cd, type: 3}
+  hashTableSize: 1000
+  particleCount: 8192
   initialVelocity: {x: 0, y: 0}
   spawnCentre: {x: 0, y: 0}
-  spawnSize: {x: 1.69, y: 2.57}
+  spawnSize: {x: 12, y: 6}
 --- !u!1 &1812641185
 GameObject:
   m_ObjectHideFlags: 0

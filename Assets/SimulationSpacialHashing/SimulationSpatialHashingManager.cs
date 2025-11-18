@@ -2,7 +2,7 @@ using UnityEngine;
 using Unity.Mathematics;
 using System.Runtime.InteropServices;
 
-public class Simulation2D : MonoBehaviour
+public class SimulationSpatialHashingManager : MonoBehaviour
 {
     [Header("Time")]
     public float timeScale = 1;
@@ -22,6 +22,7 @@ public class Simulation2D : MonoBehaviour
 
     [Header("References")]
     public ComputeShader compute;
+    public int hashTableSize;
 
     [Header("Spawn")]
     public int particleCount;
@@ -35,12 +36,17 @@ public class Simulation2D : MonoBehaviour
     public ComputeBuffer densityBuffer { get; private set; }
     ComputeBuffer predictedPositionBuffer;
 
+    ComputeBuffer particleHashTableBuffer;
+    ComputeBuffer hashOffsetTableBuffer;
+
     const int externalForcesKernel = 0;
     const int predictPositionsKernel = 1;
-    const int densityKernel = 2;
-    const int pressureKernel = 3;
-    const int viscosityKernel = 4;
-    const int updatePositionKernel = 5;
+    const int sortParticlesByHashKernel = 2;
+    const int buildHashOffsetTableKernel = 3;
+    const int densityKernel = 4;
+    const int pressureKernel = 5;
+    const int viscosityKernel = 6;
+    const int updatePositionKernel = 7;
 
     private bool isPaused;
     private float2[] particleSpawnPositions;
@@ -58,6 +64,8 @@ public class Simulation2D : MonoBehaviour
         predictedPositionBuffer = new ComputeBuffer(particleCount, Marshal.SizeOf(typeof(float2)));
         velocityBuffer = new ComputeBuffer(particleCount, Marshal.SizeOf(typeof(float2)));
         densityBuffer = new ComputeBuffer(particleCount, Marshal.SizeOf(typeof(float2)));
+        particleHashTableBuffer = new ComputeBuffer(particleCount, Marshal.SizeOf(typeof(uint)));
+        hashOffsetTableBuffer = new ComputeBuffer(hashTableSize, Marshal.SizeOf(typeof(uint)));
 
         SetInitialBufferData();
 
@@ -75,17 +83,33 @@ public class Simulation2D : MonoBehaviour
         compute.SetBuffer(predictPositionsKernel, "Positions", positionBuffer);
         compute.SetBuffer(predictPositionsKernel, "PredictedPositions", predictedPositionBuffer);
         compute.SetBuffer(predictPositionsKernel, "Velocities", velocityBuffer);
-        
+        compute.SetBuffer(predictPositionsKernel, "ParticleHashTable", particleHashTableBuffer);
+
+        compute.SetBuffer(sortParticlesByHashKernel, "Densities", densityBuffer);
+        compute.SetBuffer(sortParticlesByHashKernel, "Positions", positionBuffer);
+        compute.SetBuffer(sortParticlesByHashKernel, "PredictedPositions", predictedPositionBuffer);
+        compute.SetBuffer(sortParticlesByHashKernel, "Velocities", velocityBuffer);
+        compute.SetBuffer(sortParticlesByHashKernel, "ParticleHashTable", particleHashTableBuffer);
+
+        compute.SetBuffer(buildHashOffsetTableKernel, "ParticleHashTable", particleHashTableBuffer);
+        compute.SetBuffer(buildHashOffsetTableKernel, "HashOffsetTable", hashOffsetTableBuffer);
+
         compute.SetBuffer(densityKernel, "Densities", densityBuffer);
         compute.SetBuffer(densityKernel, "PredictedPositions", predictedPositionBuffer);
-        
+        compute.SetBuffer(densityKernel, "ParticleHashTable", particleHashTableBuffer);
+        compute.SetBuffer(densityKernel, "HashOffsetTable", hashOffsetTableBuffer);
+
         compute.SetBuffer(pressureKernel, "Densities", densityBuffer);
         compute.SetBuffer(pressureKernel, "PredictedPositions", predictedPositionBuffer);
         compute.SetBuffer(pressureKernel, "Velocities", velocityBuffer);
-        
+        compute.SetBuffer(pressureKernel, "ParticleHashTable", particleHashTableBuffer);
+        compute.SetBuffer(pressureKernel, "HashOffsetTable", hashOffsetTableBuffer);
+
         compute.SetBuffer(viscosityKernel, "Densities", densityBuffer);
         compute.SetBuffer(viscosityKernel, "PredictedPositions", predictedPositionBuffer);
         compute.SetBuffer(viscosityKernel, "Velocities", velocityBuffer);
+        compute.SetBuffer(viscosityKernel, "ParticleHashTable", particleHashTableBuffer);
+        compute.SetBuffer(viscosityKernel, "HashOffsetTable", hashOffsetTableBuffer);
 
         compute.SetBuffer(updatePositionKernel, "Positions", positionBuffer);
         compute.SetBuffer(updatePositionKernel, "Velocities", velocityBuffer);
@@ -133,6 +157,18 @@ public class Simulation2D : MonoBehaviour
     {
         Dispatch(compute, particleCount, kernelIndex: externalForcesKernel);
         Dispatch(compute, particleCount, kernelIndex: predictPositionsKernel);
+
+        for (int sortingGroupSize = 2; sortingGroupSize <= particleCount; sortingGroupSize *= 2)
+        {
+            for (int sortingDistance = sortingGroupSize / 2; sortingDistance > 0; sortingDistance /= 2)
+            {
+                compute.SetInt("sortingGroupSize", sortingGroupSize);
+                compute.SetInt("sortingDistance", sortingDistance);
+                Dispatch(compute, particleCount, kernelIndex: sortParticlesByHashKernel);
+            }
+        }
+
+        Dispatch(compute, hashTableSize, kernelIndex: buildHashOffsetTableKernel);
         Dispatch(compute, particleCount, kernelIndex: densityKernel);
         Dispatch(compute, particleCount, kernelIndex: pressureKernel);
         Dispatch(compute, particleCount, kernelIndex: viscosityKernel);
@@ -155,6 +191,7 @@ public class Simulation2D : MonoBehaviour
         compute.SetFloat("nearPressureMultiplier", nearPressureMultiplier);
         compute.SetFloat("viscosityStrength", viscosityMultiplier);
         compute.SetVector("boundsSize", boundsSize);
+        compute.SetInt("hashTableSize", hashTableSize);
 
         compute.SetFloat("Poly6ScalingFactor", 4 / (Mathf.PI * Mathf.Pow(smoothingRadius, 8)));
         compute.SetFloat("SpikyPow3ScalingFactor", 10 / (Mathf.PI * Mathf.Pow(smoothingRadius, 5)));

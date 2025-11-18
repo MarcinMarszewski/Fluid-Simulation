@@ -1,0 +1,273 @@
+#pragma kernel CalculateExternalForces
+#pragma kernel CalculateDensities
+#pragma kernel CalculatePressureForce
+#pragma kernel CalculateViscosity
+#pragma kernel UpdatePositions
+
+static const int NumThreads = 64;
+
+// Kernel Constants (set from C# via compute.SetFloat)
+float Poly6ScalingFactor;
+float SpikyPow3ScalingFactor;
+float SpikyPow2ScalingFactor;
+float SpikyPow3DerivativeScalingFactor;
+float SpikyPow2DerivativeScalingFactor;
+
+// Buffers
+RWStructuredBuffer<float2> Positions;
+RWStructuredBuffer<float2> PredictedPositions;
+RWStructuredBuffer<float2> Velocities;
+RWStructuredBuffer<float2> Densities;
+
+// Simulation Settings (set from C#)
+uint numParticles;
+float gravity;
+float timeStep;
+float collisionDamping;
+float smoothingRadius;
+float targetDensity;
+float pressureMultiplier;
+float nearPressureMultiplier;
+float viscosityStrength;
+float2 boundsSize;
+
+// Kernel Functions
+float Poly6Kernel(float distance, float radius)
+{
+	if (distance >= radius)
+		return 0;
+	float v = radius * radius - distance * distance;
+	return v * v * v * Poly6ScalingFactor;
+}
+
+float Pow3Kernel(float distance, float radius)
+{
+	if (distance >= radius)
+        return 0;
+	float v = radius - distance;
+	return v * v * v * SpikyPow3ScalingFactor;
+}
+
+float Pow2Kernel(float distance, float radius)
+{
+	if (distance >= radius)
+        return 0;
+	float v = radius - distance;
+	return v * v * SpikyPow2ScalingFactor;
+}
+
+float Pow3KernelGradient(float distance, float radius)
+{
+	if (distance > radius)
+        return 0;
+	float v = radius - distance;
+	return -v * v * SpikyPow3DerivativeScalingFactor;
+}
+
+float Pow2KernelGradient(float distance, float radius)
+{
+	if (distance > radius)
+        return 0;
+	float v = radius - distance;
+	return -v * SpikyPow2DerivativeScalingFactor;
+}
+
+// Kernel Wrappers
+
+float DensityKernel(float distance, float radius)
+{
+	return Pow2Kernel(distance, radius);
+}
+
+float NearDensityKernel(float distance, float radius)
+{
+	return Pow3Kernel(distance, radius);
+}
+
+float DensityDerivative(float distance, float radius)
+{
+	return Pow2KernelGradient(distance, radius);
+}
+
+float NearDensityDerivative(float distance, float radius)
+{
+	return Pow3KernelGradient(distance, radius);
+}
+
+float ViscosityKernel(float distance, float radius)
+{
+	return Poly6Kernel(distance, radius);
+}
+
+
+//Simulation Functions
+float2 CalculateDensity(float2 position)
+{
+	float sqrSmoothingRadius = smoothingRadius * smoothingRadius;
+	float density = 0;
+	float nearDensity = 0;
+
+	for (int secondParticleIndex = 0; secondParticleIndex < numParticles; secondParticleIndex++)
+	{
+			float2 secondParticlePosition = PredictedPositions[secondParticleIndex];
+			float2 vectorToSecondParticle = secondParticlePosition - position;
+			float sqrDstToSecondParticle = dot(vectorToSecondParticle, vectorToSecondParticle);
+
+			if (sqrDstToSecondParticle > sqrSmoothingRadius)
+				continue;
+
+			float dst = sqrt(sqrDstToSecondParticle);
+			density += DensityKernel(dst, smoothingRadius);
+			nearDensity += NearDensityKernel(dst, smoothingRadius);
+	}
+
+	return float2(density, nearDensity);
+}
+
+float PressureFromDensity(float density)
+{
+	return (density - targetDensity) * pressureMultiplier;
+}
+
+float NearPressureFromDensity(float nearDensity)
+{
+	return nearPressureMultiplier * nearDensity;
+}
+
+float2 ExternalForces(float2 pos, float2 velocity)
+{
+	// Gravity
+	return float2(0, gravity);
+}
+
+
+void HandleCollisions(uint particleIndex)
+{
+	float2 pos = Positions[particleIndex];
+	float2 vel = Velocities[particleIndex];
+
+	const float2 halfSize = boundsSize * 0.5;
+	float2 edgeDst = halfSize - abs(pos);
+
+	if (edgeDst.x <= 0)
+	{
+		pos.x = halfSize.x * sign(pos.x);
+		vel.x *= -1 * collisionDamping;
+	}
+	if (edgeDst.y <= 0)
+	{
+		pos.y = halfSize.y * sign(pos.y);
+		vel.y *= -1 * collisionDamping;
+	}
+
+	Positions[particleIndex] = pos;
+	Velocities[particleIndex] = vel;
+}
+
+//GPU Kernels
+[numthreads(NumThreads, 1, 1)]
+void CalculateExternalForces(uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= numParticles)
+		return;
+
+	Velocities[id.x] += ExternalForces(Positions[id.x], Velocities[id.x]) * timeStep;
+	
+	//Predict Positions
+    const float predictionStep = 1 / 120.0;
+    PredictedPositions[id.x] = Positions[id.x] + Velocities[id.x] * predictionStep;
+}
+
+[numthreads(NumThreads, 1, 1)]
+void CalculateDensities(uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= numParticles)
+		return;
+
+	float2 position = PredictedPositions[id.x];
+	Densities[id.x] = CalculateDensity(position);
+}
+
+[numthreads(NumThreads, 1, 1)]
+void CalculatePressureForce(uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= numParticles)
+		return;
+
+	float density = Densities[id.x][0];
+	float densityNear = Densities[id.x][1];
+	float pressure = PressureFromDensity(density);
+	float nearPressure = NearPressureFromDensity(densityNear);
+	float2 pressureForce = 0;
+	
+	float2 position = PredictedPositions[id.x];
+	float sqrSmoothingRadius = smoothingRadius * smoothingRadius;
+
+	for (uint secondParticleIndex = 0; secondParticleIndex < numParticles; secondParticleIndex++)
+	{
+			if (secondParticleIndex == id.x)
+				continue;
+
+			float2 secondParticlePosition = PredictedPositions[secondParticleIndex];
+			float2 vectorToSecondParticle = secondParticlePosition - position;
+			float sqrDstToSecondParticle = dot(vectorToSecondParticle, vectorToSecondParticle);
+
+			if (sqrDstToSecondParticle > sqrSmoothingRadius)
+				continue;
+
+			float distanceToSecondParticle = sqrt(sqrDstToSecondParticle);
+			float2 interractionDirection = distanceToSecondParticle > 0 ? vectorToSecondParticle / distanceToSecondParticle : float2(0, 1);
+
+			float secondParticlePressure = PressureFromDensity(Densities[secondParticleIndex][0]);
+			float secondParticleNearPressure = NearPressureFromDensity(Densities[secondParticleIndex][1]);
+
+			float sharedPressure = (pressure + secondParticlePressure) * 0.5;
+			float sharedNearPressure = (nearPressure + secondParticleNearPressure) * 0.5;
+
+			pressureForce += interractionDirection * DensityDerivative(distanceToSecondParticle, smoothingRadius) * sharedPressure / Densities[secondParticleIndex][0];
+			pressureForce += interractionDirection * NearDensityDerivative(distanceToSecondParticle, smoothingRadius) * sharedNearPressure / Densities[secondParticleIndex][1];
+	}
+	float2 acceleration = pressureForce / density;
+	Velocities[id.x] += acceleration * timeStep;
+}
+
+[numthreads(NumThreads, 1, 1)]
+void CalculateViscosity(uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= numParticles)
+		return;
+	
+	float2 position = PredictedPositions[id.x];
+	float sqrSmoothingRadius = smoothingRadius * smoothingRadius;
+
+	float2 viscosityForce = 0;
+	float2 velocity = Velocities[id.x];
+
+	for (uint secondParticleIndex = 0; secondParticleIndex < numParticles; secondParticleIndex++)
+	{
+			if (secondParticleIndex == id.x)
+				continue;
+
+			float2 secondParticlePosition = PredictedPositions[secondParticleIndex];
+			float2 vectorToSecondParticle = secondParticlePosition - position;
+			float sqrDstToSecondParticle = dot(vectorToSecondParticle, vectorToSecondParticle);
+
+			if (sqrDstToSecondParticle > sqrSmoothingRadius)
+				continue;
+
+			float distanceToSecondParticle = sqrt(sqrDstToSecondParticle);
+			float2 secondParticleVelocity = Velocities[secondParticleIndex];
+			viscosityForce += (secondParticleVelocity - velocity) * ViscosityKernel(distanceToSecondParticle, smoothingRadius);
+	}
+	Velocities[id.x] += viscosityForce * viscosityStrength * timeStep;
+}
+
+[numthreads(NumThreads, 1, 1)]
+void UpdatePositions(uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= numParticles)
+		return;
+
+	Positions[id.x] += Velocities[id.x] * timeStep;
+	HandleCollisions(id.x);
+}

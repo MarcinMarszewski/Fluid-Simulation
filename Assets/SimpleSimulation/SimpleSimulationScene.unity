@@ -409,7 +409,7 @@ MonoBehaviour:
   particleCount: 1000
   initialVelocity: {x: 0, y: 0}
   spawnCentre: {x: 0, y: 0}
-  spawnSize: {x: 1.69, y: 2.57}
+  spawnSize: {x: 12, y: 6}
 --- !u!1 &1812641185
 GameObject:
   m_ObjectHideFlags: 0
