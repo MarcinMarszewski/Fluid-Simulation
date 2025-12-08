@@ -1,6 +1,8 @@
-using UnityEngine;
-using Unity.Mathematics;
+using System.Collections;
 using System.Runtime.InteropServices;
+using Unity.Mathematics;
+using UnityEngine;
+using UnityEngine.Rendering;
 
 public class SimulationSpatialHashingManager : MonoBehaviour
 {
@@ -64,8 +66,8 @@ public class SimulationSpatialHashingManager : MonoBehaviour
         predictedPositionBuffer = new ComputeBuffer(particleCount, Marshal.SizeOf(typeof(float2)));
         velocityBuffer = new ComputeBuffer(particleCount, Marshal.SizeOf(typeof(float2)));
         densityBuffer = new ComputeBuffer(particleCount, Marshal.SizeOf(typeof(float2)));
-        particleHashTableBuffer = new ComputeBuffer(particleCount, Marshal.SizeOf(typeof(uint)));
-        hashOffsetTableBuffer = new ComputeBuffer(hashTableSize, Marshal.SizeOf(typeof(uint)));
+        particleHashTableBuffer = new ComputeBuffer(particleCount, Marshal.SizeOf(typeof(int)));
+        hashOffsetTableBuffer = new ComputeBuffer(hashTableSize, Marshal.SizeOf(typeof(int)));
 
         SetInitialBufferData();
 
@@ -155,6 +157,48 @@ public class SimulationSpatialHashingManager : MonoBehaviour
 
     void RunSimulationStep()
     {
+        /*CommandBuffer cmd = new CommandBuffer();
+        cmd.name = "HashSimulation Prepare";
+        cmd.BeginSample("External Forces");
+        cmd.DispatchCompute(compute, externalForcesKernel, Mathf.CeilToInt(particleCount / 64.0f), 1, 1);
+        cmd.EndSample("External Forces");
+        cmd.BeginSample("Predict Positions");
+        cmd.DispatchCompute(compute, predictPositionsKernel, Mathf.CeilToInt(particleCount / 64.0f), 1, 1);
+        cmd.EndSample("Predict Positions");
+        Graphics.ExecuteCommandBuffer(cmd);
+        cmd.Release();
+        
+        for (int sortingGroupSize = 2; sortingGroupSize <= particleCount; sortingGroupSize *= 2)
+        {
+            for (int sortingDistance = sortingGroupSize / 2; sortingDistance > 0; sortingDistance /= 2)
+            {
+                compute.SetInt("sortingGroupSize", sortingGroupSize);
+                compute.SetInt("sortingDistance", sortingDistance);
+                Dispatch(compute, particleCount, kernelIndex: sortParticlesByHashKernel);
+            }
+        }
+
+        cmd = new CommandBuffer();
+        cmd.name = "HashSimulation Step";
+        cmd.BeginSample("Build Hash Offset Table");
+        cmd.DispatchCompute(compute, buildHashOffsetTableKernel, Mathf.CeilToInt(hashTableSize / 64.0f), 1, 1);
+        cmd.EndSample("Build Hash Offset Table");
+        cmd.BeginSample("Density");
+        cmd.DispatchCompute(compute, densityKernel, Mathf.CeilToInt(particleCount / 64.0f), 1, 1);
+        cmd.EndSample("Density");
+        cmd.BeginSample("Pressure");
+        cmd.DispatchCompute(compute, pressureKernel, Mathf.CeilToInt(particleCount / 64.0f), 1, 1);
+        cmd.EndSample("Pressure");
+        cmd.BeginSample("Viscosity");
+        cmd.DispatchCompute(compute, viscosityKernel, Mathf.CeilToInt(particleCount / 64.0f), 1, 1);
+        cmd.EndSample("Viscosity");
+        cmd.BeginSample("Update Positions");
+        cmd.DispatchCompute(compute, updatePositionKernel, Mathf.CeilToInt(particleCount / 64.0f), 1, 1);
+        cmd.EndSample("Update Positions");
+        Graphics.ExecuteCommandBuffer(cmd);
+        cmd.Release();*/
+
+
         Dispatch(compute, particleCount, kernelIndex: externalForcesKernel);
         Dispatch(compute, particleCount, kernelIndex: predictPositionsKernel);
 

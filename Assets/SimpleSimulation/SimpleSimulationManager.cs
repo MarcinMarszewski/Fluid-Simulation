@@ -1,6 +1,7 @@
 using UnityEngine;
 using Unity.Mathematics;
 using System.Runtime.InteropServices;
+using UnityEngine.Rendering;
 
 public class SimpleSimulation : MonoBehaviour
 {
@@ -131,12 +132,34 @@ public class SimpleSimulation : MonoBehaviour
 
     void RunSimulationStep()
     {
-        Dispatch(compute, particleCount, kernelIndex: externalForcesKernel);
+        CommandBuffer cmd = new CommandBuffer();
+        cmd.name = "SimpleSimulation Step";
+        cmd.BeginSample("External Forces");
+        cmd.DispatchCompute(compute, externalForcesKernel, Mathf.CeilToInt(particleCount / 64.0f), 1, 1);
+        cmd.EndSample("External Forces");
+        cmd.BeginSample("Predict Positions");
+        cmd.DispatchCompute(compute, predictPositionsKernel, Mathf.CeilToInt(particleCount / 64.0f), 1, 1);
+        cmd.EndSample("Predict Positions");
+        cmd.BeginSample("Density Calculation");
+        cmd.DispatchCompute(compute, densityKernel, Mathf.CeilToInt(particleCount / 64.0f), 1, 1);
+        cmd.EndSample("Density Calculation");
+        cmd.BeginSample("Pressure Calculation");
+        cmd.DispatchCompute(compute, pressureKernel, Mathf.CeilToInt(particleCount / 64.0f), 1, 1);
+        cmd.EndSample("Pressure Calculation");
+        cmd.BeginSample("Viscosity Calculation");
+        cmd.DispatchCompute(compute, viscosityKernel, Mathf.CeilToInt(particleCount / 64.0f), 1, 1);
+        cmd.EndSample("Viscosity Calculation");
+        cmd.BeginSample("Update Positions");
+        cmd.DispatchCompute(compute, updatePositionKernel, Mathf.CeilToInt(particleCount / 64.0f), 1, 1);
+        cmd.EndSample("Update Positions");
+        Graphics.ExecuteCommandBuffer(cmd);
+        cmd.Release();
+        /*Dispatch(compute, particleCount, kernelIndex: externalForcesKernel);
         Dispatch(compute, particleCount, kernelIndex: predictPositionsKernel);
         Dispatch(compute, particleCount, kernelIndex: densityKernel);
         Dispatch(compute, particleCount, kernelIndex: pressureKernel);
         Dispatch(compute, particleCount, kernelIndex: viscosityKernel);
-        Dispatch(compute, particleCount, kernelIndex: updatePositionKernel);
+        Dispatch(compute, particleCount, kernelIndex: updatePositionKernel);*/
     }
 
     void UpdateTimeStep(float timeStep)
